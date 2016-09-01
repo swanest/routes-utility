@@ -1,0 +1,15 @@
+{
+  "name": "routes-utility",
+  "version": "1.0.0",
+  "description": "Utility which enables you to manage routes in a like-express style",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "SYNC Financial Technology ltd.",
+  "license": "MIT",
+  "dependencies": {
+    "lodash": "^4.15.0",
+    "logger": "git+https://github.com/swanest/logger.git"
+  }
+}
