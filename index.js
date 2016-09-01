@@ -1,4 +1,5 @@
 var _ = require("lodash"),
+    when = require("when"),
     ERR = require("logger").CustomError,
     router = {},
     routes = {};
