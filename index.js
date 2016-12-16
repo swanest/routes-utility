@@ -1,6 +1,6 @@
 var _ = require("lodash"),
     when = require("when"),
-    ERR = require("logger").CustomError,
+    ERR = require("sw-logger").CustomError,
     router = {},
     routes = {};
 

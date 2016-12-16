@@ -1,6 +1,6 @@
 {
   "name": "routes-utility",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Utility which enables you to manage routes in a like-express style",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "lodash": "^4.15.0",
-    "logger": "git+https://github.com/swanest/logger.git",
+    "sw-logger": "^1.0.0",
     "when": "^3.7.7"
   }
 }
