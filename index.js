@@ -4,9 +4,14 @@ var _ = require("lodash"),
     router = {},
     routes = {};
 
-router.addRoute = _.rest(function addRoute(name, steps) {
+router.addRoute = function addRoute(name, ...steps) {
+    for (let i = 0; i < steps.length; i++) {
+        if (steps[i].name == '')
+            throw new ERR("missingControllerName", "a route must only have named functions", 500, "fatal");
+    }
     routes[name] = steps;
-});
+    return router;
+};
 
 router.getRoutes = function getRoutes() {
     return routes;
@@ -49,8 +54,11 @@ router.match = function matchRoute(routeName, req, done, _this) {
             else {
                 try {
                     if (controller != void 0) { //Jump to a specific controller
-                        while (controller !== fn && i < route.length - 1)
+                        while (controller !== fn && controller !== fn.name && i < route.length - 1) {
                             i++, fn = route[i];
+                        }
+                        if (controller !== fn && controller !== fn.name)
+                            throw new ERR("controllerJumpFailed", "%s not found in route", controller, 500, "fatal");
                     }
                     else
                         i++, fn = route[i];
@@ -79,7 +87,7 @@ router.match = function matchRoute(routeName, req, done, _this) {
         }
 
     }
-    return prom;
+    return prom || router;
 };
 
 module.exports = router;
