@@ -16,8 +16,8 @@ export interface IControllerFn<CONTEXT,INIT_REQ,RES,NEXT_RES,FINAL_RES> {
     (this: CONTEXT, req: INIT_REQ, res: RES, next: INextFn<NEXT_RES>, done: IDoneFn<FINAL_RES>): void;
 }
 
-export interface IProgression {
-    lastExecutedController: string;
+export interface IProgression<C> {
+    lastExecutedController: C;
     nextIndex: number;
     routeSize: number;
     req: any;
@@ -96,7 +96,7 @@ export class Route<CONTEXT,INIT_REQ,FINAL_RES> {
         return this;
     }
 
-    match(req: INIT_REQ, context: CONTEXT, onProgress?: (progression: IProgression)=>any): When.Promise<FINAL_RES> {
+    match(req: INIT_REQ, context: CONTEXT, onProgress?: (progression: IProgression<Controller<CONTEXT,INIT_REQ,any,any,FINAL_RES>>)=>any): When.Promise<FINAL_RES> {
 
         if (!_.isArray(this._controllers) || !this._controllers.length)
             throw new CustomError("invalidRoute", "route %s does not contain any controller", this._name);
@@ -104,7 +104,6 @@ export class Route<CONTEXT,INIT_REQ,FINAL_RES> {
         let index: number = 0,
             currentController = this._controllers[index],
             lastExecutedController: Controller<CONTEXT,INIT_REQ,any,any,FINAL_RES>,
-            onProgressFns: Array<any> = [],
             def = When.defer<FINAL_RES>(),
             finish: IDoneFn<FINAL_RES> = (res) => {
                 if (_.isFinite(this._statistics.PENDING.STAGES[lastExecutedController.name]))
@@ -117,10 +116,6 @@ export class Route<CONTEXT,INIT_REQ,FINAL_RES> {
                 else
                     def.resolve(res), this._statistics.FINISHED.SUCCESS++;
             };
-
-
-        if (onProgress != void 0)
-            onProgressFns.push(onProgress);
 
         this._statistics.PENDING.TOTAL++;
 
@@ -150,15 +145,16 @@ export class Route<CONTEXT,INIT_REQ,FINAL_RES> {
                 });
                 this._statistics.PENDING.STAGES[currentController.name]++;
 
-                When.all(_.map(onProgressFns, (pFn) => {
-                    return pFn({
-                        lastExecutedController: lastExecutedController,
-                        nextIndex: index,
-                        routeSize: this._controllers.length,
-                        req: req,
-                        res: res
-                    });
-                })).then(() => {
+                When<any>(null).then(() => {
+                    if (_.isFunction(onProgress))
+                        return onProgress({
+                            lastExecutedController: lastExecutedController,
+                            nextIndex: index,
+                            routeSize: this._controllers.length,
+                            req: req,
+                            res: res
+                        });
+                }).then(() => {
                     lastExecutedController = currentController;
                     currentController.body.call(context, req, res, next, finish);
                 }).catch((err) => {
