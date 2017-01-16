@@ -1,5 +1,5 @@
 import {expect} from "chai";
-import {Router, Route, Controller} from '../src/index';
+import {Router, Route, Controller, defaultRouter} from '../src/index';
 import * as _ from "lodash";
 import * as When from "when";
 import {CustomError} from 'sw-logger';
@@ -56,7 +56,7 @@ describe("Router", () => {
         route.addController(controllerC);
         route.addController(controllerD);
 
-        let router = new Router();
+        let router = defaultRouter;
         router.addRoute(route);
         expect(router.routes["test"]).to.be.not.null;
         let progressions: any[] = [];

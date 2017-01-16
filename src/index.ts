@@ -239,3 +239,5 @@ export class Router {
     }
 
 }
+
+export const defaultRouter = new Router();
