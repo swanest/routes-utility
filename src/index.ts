@@ -156,7 +156,7 @@ export class Route<CONTEXT,INIT_REQ,FINAL_RES> {
                         });
                 }).then(() => {
                     lastExecutedController = currentController;
-                    currentController.body.call(context, req, res, next, finish);
+                    return currentController.body.call(context, req, res, next, finish);
                 }).catch((err) => {
                     next(err); // is similar to finish(err)
                 });
@@ -164,16 +164,16 @@ export class Route<CONTEXT,INIT_REQ,FINAL_RES> {
         };
 
         setImmediate(() => {
-            try {
+            When<any>(null).then(() => {
                 _.defaults(this._statistics.PENDING.STAGES, {
                     [currentController.name]: 0
                 });
                 this._statistics.PENDING.STAGES[currentController.name]++;
                 lastExecutedController = currentController;
-                currentController.body.call(context, req, req, next, finish);
-            } catch (e) {
+                return currentController.body.call(context, req, req, next, finish);
+            }).catch((e) => {
                 next(e); //is similar to finish(err)
-            }
+            });
         });
 
         return def.promise;

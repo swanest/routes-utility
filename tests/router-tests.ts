@@ -6,7 +6,47 @@ import {CustomError} from 'sw-logger';
 
 describe("Router", () => {
 
-    it("follows the journey", function (done){
+    it("handles errors", async function () {
+
+        let controllerA = new Controller(async function A(req, res, next, done) {
+            await Promise.reject(new Error('test'));
+            // await test();
+        });
+
+
+        let controllerB = new Controller(async function B(req, res, next, done) {
+            // await test();
+            next({});
+        });
+
+
+        let controllerC = new Controller(async function C(req, res, next, done) {
+            await Promise.reject(new Error('test'));
+            // await test();
+        });
+
+
+        let routeA = new Route("testA", ...[controllerA]);
+        let routeB = new Route("testB", ...[controllerB, controllerC]);
+        let router = new Router();
+        router.addRoute(routeA).addRoute(routeB);
+
+        await routeA.match({}, {}).then(function () {
+            throw new Error('not expected');
+        }).catch(function (e: Error) {
+            expect(e.message).to.equal('test');
+        });
+
+        await routeB.match({}, {}).then(function () {
+            throw new Error('not expected');
+        }).catch(function (e: Error) {
+            expect(e.message).to.equal('test');
+        });
+
+
+    });
+
+    it("follows the journey", function (done) {
         this.timeout(3000);
         interface IContext {
             thisOnlyIsAccessible: boolean
@@ -60,7 +100,7 @@ describe("Router", () => {
         router.addRoute(route);
         expect(router.routes["test"]).to.be.not.null;
         let progressions: any[] = [];
-        
+
         router.getRoute<IContext,IReq,IFinal>("test").match({
             inputOne: 1,
             inputTwo: "hello"
