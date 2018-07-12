@@ -10,7 +10,7 @@ export interface INextFn<NEXT_RES> {
     (res: Error | NEXT_RES, jump?: Controller<any, any, NEXT_RES, any, any> | string): void;
 }
 
-export interface IControllerFn<CONTEXT, INIT_REQ, RES, NEXT_RES, FINAL_RES> {
+export interface IControllerFn<CONTEXT, INIT_REQ, RES=INIT_REQ, NEXT_RES=INIT_REQ, FINAL_RES=INIT_REQ> {
     (this: CONTEXT, req: INIT_REQ, res: RES, next: INextFn<NEXT_RES>, done: IDoneFn<FINAL_RES>): void;
 }
 
@@ -23,7 +23,7 @@ export interface IProgression<C> {
 }
 
 //Controller
-export class Controller<CONTEXT, INIT_REQ, RES, NEXT_RES, FINAL_RES> {
+export class Controller<CONTEXT, INIT_REQ, RES=INIT_REQ, NEXT_RES=INIT_REQ, FINAL_RES=INIT_REQ> {
 
     private _fn: IControllerFn<CONTEXT, INIT_REQ, RES, NEXT_RES, FINAL_RES>;
     private _name: string;
@@ -61,7 +61,7 @@ export interface IRouteStatistics {
 }
 
 //Route
-export class Route<CONTEXT, INIT_REQ, FINAL_RES> {
+export class Route<CONTEXT, INIT_REQ, FINAL_RES=INIT_REQ> {
     private _steps: Array<Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>>;
     private _name: string;
 
