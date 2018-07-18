@@ -1,7 +1,7 @@
 import * as _ from 'lodash';
 import { CustomError } from 'sw-logger';
 
-//Interfaces
+// Interfaces
 export interface IDoneFn<FINAL_RES> {
     (output: Error | FINAL_RES): void;
 }
@@ -10,7 +10,7 @@ export interface INextFn<NEXT_RES> {
     (res: Error | NEXT_RES, jump?: Controller<any, any, NEXT_RES, any, any> | string): void;
 }
 
-export interface IControllerFn<CONTEXT, INIT_REQ, RES=INIT_REQ, NEXT_RES=INIT_REQ, FINAL_RES=INIT_REQ> {
+export interface IControllerFn<CONTEXT, INIT_REQ, RES= INIT_REQ, NEXT_RES= INIT_REQ, FINAL_RES= INIT_REQ> {
     (this: CONTEXT, req: INIT_REQ, res: RES, next: INextFn<NEXT_RES>, done: IDoneFn<FINAL_RES>): void;
 }
 
@@ -22,8 +22,8 @@ export interface IProgression<C> {
     routeSize: number;
 }
 
-//Controller
-export class Controller<CONTEXT, INIT_REQ, RES=INIT_REQ, NEXT_RES=INIT_REQ, FINAL_RES=INIT_REQ> {
+// Controller
+export class Controller<CONTEXT, INIT_REQ, RES= INIT_REQ, NEXT_RES= INIT_REQ, FINAL_RES= INIT_REQ> {
 
     private _fn: IControllerFn<CONTEXT, INIT_REQ, RES, NEXT_RES, FINAL_RES>;
     private _name: string;
@@ -38,9 +38,10 @@ export class Controller<CONTEXT, INIT_REQ, RES=INIT_REQ, NEXT_RES=INIT_REQ, FINA
 
     constructor(fn: IControllerFn<CONTEXT, INIT_REQ, RES, NEXT_RES, FINAL_RES>, name?: string) {
         this._fn = fn;
-        name != void 0 ? this._name = name : this._name = this._fn.name;
-        if (name == '')
+        name != null ? this._name = name : this._name = this._fn.name;
+        if (name === '') {
             throw new CustomError('missingControllerName', 'only named controllers are authorized', 500, 'fatal');
+        }
     }
 
 }
@@ -60,8 +61,8 @@ export interface IRouteStatistics {
     timestamp_ms: number;
 }
 
-//Route
-export class Route<CONTEXT, INIT_REQ, FINAL_RES=INIT_REQ> {
+// Route
+export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
     private _steps: Array<Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>>;
     private _name: string;
 
@@ -85,7 +86,7 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES=INIT_REQ> {
     private _initStatistics: IRouteStatistics = this._statistics;
 
     get statistics(): IRouteStatistics {
-        let s = _.cloneDeep(this._statistics);
+        const s = _.cloneDeep(this._statistics);
         s.timestamp_ms = Date.now();
         return s;
     }
@@ -105,8 +106,9 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES=INIT_REQ> {
     }
 
     addController(step: Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES>): this {
-        if (_.find(this._steps, {name: step.name}) != void 0)
+        if (_.find(this._steps, {name: step.name}) != null) {
             throw new CustomError('duplicatedControllerName', 'a step with name %s already exists in route %s', step.name, this.name, 500, 'fatal');
+        }
         this._statistics.PENDING.STAGES[step.name] = 0;
         this._steps.push(step);
         this._initStatistics = _.cloneDeep(this._statistics);
@@ -114,8 +116,9 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES=INIT_REQ> {
     }
 
     addSubroute(step: Route<CONTEXT, INIT_REQ, FINAL_RES>): this {
-        if (_.find(this._steps, {name: step.name}) != void 0)
+        if (_.find(this._steps, {name: step.name}) != null) {
             throw new CustomError('duplicatedSubrouteName', 'a step with name %s already exists in route %s', step.name, this.name, 500, 'fatal');
+        }
         this._statistics.PENDING.STAGES[step.name] = 0;
         this._steps.push(step);
         this._initStatistics = _.cloneDeep(this._statistics);
@@ -123,9 +126,10 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES=INIT_REQ> {
     }
 
     delta(x?: IRouteStatistics): IRouteStatistics {
-        if (x == void 0)
+        if (x == null) {
             x = this._initStatistics;
-        let y = this.statistics,
+        }
+        const y = this.statistics,
             s: IRouteStatistics = {
                 FINISHED: {
                     SUCCESS: y.FINISHED.SUCCESS - x.FINISHED.SUCCESS,
@@ -144,17 +148,21 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES=INIT_REQ> {
         return s;
     }
 
-    async match(req: INIT_REQ, context: CONTEXT, onProgress?: (progression: IProgression<Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>>) => any): Promise<FINAL_RES> {
-        if (!_.isArray(this._steps) || !this._steps.length)
+    async match(req: INIT_REQ,
+                context: CONTEXT,
+                onProgress?: (progression: IProgression<Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>>) => any): Promise<FINAL_RES> {
+        if (!_.isArray(this._steps) || !this._steps.length) {
             throw new CustomError('invalidRoute', 'route %s does not contain any controller', this._name);
+        }
         let index: number = 0,
             currentStep = this._steps[index],
             lastExecutedStep: Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>;
 
         return new Promise<FINAL_RES>(async (resolve, reject) => {
             const finish: IDoneFn<FINAL_RES> = (res) => {
-                if (_.isFinite(this._statistics.PENDING.STAGES[lastExecutedStep.name]))
+                if (_.isFinite(this._statistics.PENDING.STAGES[lastExecutedStep.name])) {
                     this._statistics.PENDING.STAGES[lastExecutedStep.name]--;
+                }
                 this._statistics.PENDING.TOTAL--, this._statistics.FINISHED.TOTAL++;
                 if (res instanceof CustomError) {
                     reject(res);
@@ -169,26 +177,27 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES=INIT_REQ> {
             };
             this._statistics.PENDING.TOTAL++;
             const next = (res: any, step?: any) => {
-                if (res instanceof Error)
+                if (res instanceof Error) {
                     finish(res);
-                else if (index == this._steps.length - 1) //finish
+                } else if (index === this._steps.length - 1) { // finish
                     finish(res);
-                else {
+                } else {
                     // Define next step
-                    if (step != void 0) { //Jump to a specific step
+                    if (step != null) { // Jump to a specific step
                         while (step !== currentStep && step !== currentStep.name && index < this._steps.length - 1) {
                             index++;
                             currentStep = this._steps[index];
                         }
-                        if (step !== currentStep && step !== currentStep.name)
+                        if (step !== currentStep && step !== currentStep.name) {
                             throw new CustomError('controllerJumpFailed', '%s not found in route %s', step, this._name, 500, 'fatal');
-                    }
-                    else {
+                        }
+                    } else {
                         index++;
                         currentStep = this._steps[index];
                     }
-                    if (_.isFinite(this._statistics.PENDING.STAGES[lastExecutedStep.name]))
+                    if (_.isFinite(this._statistics.PENDING.STAGES[lastExecutedStep.name])) {
                         this._statistics.PENDING.STAGES[lastExecutedStep.name]--;
+                    }
                     _.defaults(this._statistics.PENDING.STAGES, {
                         [currentStep.name]: 0,
                     });

@@ -4,7 +4,7 @@
     "type": "git",
     "url": "https://github.com/swanest/routes-utility"
   },
-  "version": "2.1.1",
+  "version": "2.1.2",
   "scripts": {
     "test": "./node_modules/.bin/mocha --opts tests/mocha.opts tests/**/*.ts",
     "build": "rm -rf dist && ./node_modules/typescript/bin/tsc -p . && rm -rf dist/tests && mv dist/src/** dist/ && rm -rf dist/src",
@@ -29,6 +29,8 @@
     "mocha": "^5.2.0",
     "typescript": "^2.9.2",
     "mocha-clean": "^1.0.0",
-    "ts-node": "^7.0.0"
+    "ts-node": "^7.0.0",
+    "tslint": "^5.10.0",
+    "tslint-no-unused-expression-chai": "^0.1.3"
   }
 }

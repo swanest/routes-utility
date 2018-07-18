@@ -38,7 +38,7 @@ describe('Router', () => {
         this.timeout(3000);
 
         interface IContext {
-            thisOnlyIsAccessible: boolean
+            thisOnlyIsAccessible: boolean;
         }
 
         interface IReq {
@@ -53,34 +53,38 @@ describe('Router', () => {
         }
 
         interface IFinal {
-            output: string
+            output: string;
         }
 
         const controllerA = new Controller<IContext, IReq, IReq, IReqExtended, IFinal>(function A(req, res, next, done) {
-            if (!this.thisOnlyIsAccessible)
+            if (!this.thisOnlyIsAccessible) {
                 throw Error('context not given');
-            let nextRes = _.defaults(req, {stage: 0});
+            }
+            const nextRes = _.defaults(req, {stage: 0});
             nextRes.stage++;
             next(nextRes);
         });
         const controllerB = new Controller<IContext, IReq, IReqExtended, IReqExtended, IFinal>(function B(req, res, next, done) {
-            if (!this.thisOnlyIsAccessible)
+            if (!this.thisOnlyIsAccessible) {
                 throw Error('context not given');
-            let nextRes = _.defaults(req, {stage: 0});
+            }
+            const nextRes = _.defaults(req, {stage: 0});
             nextRes.stage++;
             next(nextRes, 'D');
         });
         const controllerC = new Controller<IContext, IReq, IReqExtended, IReqExtended, IFinal>(function C(req, res, next, done) {
-            if (!this.thisOnlyIsAccessible)
+            if (!this.thisOnlyIsAccessible) {
                 throw Error('context not given');
-            let nextRes = _.defaults(req, {stage: 0});
+            }
+            const nextRes = _.defaults(req, {stage: 0});
             nextRes.stage++;
             next(nextRes);
         });
         const controllerD = new Controller<IContext, IReq, IReqExtended, IReqExtended, IFinal>(function D(req, res, next, done) {
-            if (!this.thisOnlyIsAccessible)
+            if (!this.thisOnlyIsAccessible) {
                 throw Error('context not given');
-            let nextRes = _.defaults(req, {stage: 0});
+            }
+            const nextRes = _.defaults(req, {stage: 0});
             nextRes.stage++;
             next(nextRes);
         });
@@ -89,7 +93,7 @@ describe('Router', () => {
         route.addController(controllerC);
         route.addController(controllerD);
         defaultRouter.addRoute(route);
-        expect(defaultRouter.routes['test']).to.be.not.null;
+        expect(defaultRouter.routes.test).to.be.not.null;
         const progressions: any[] = [];
         const routeResult = await defaultRouter.getRoute<IContext, IReq, IFinal>('test').match({
             inputOne: 1,
