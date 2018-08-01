@@ -182,4 +182,33 @@ describe('Router', () => {
         expect(err.codeString).to.eql('euh');
     });
 
+
+    it('handle timeouts & max parallel', async function () {
+        this.timeout(1000);
+        const route = new Route('beta-route',
+            new Controller(async function Timeout(req: any, res: any, next, done) {
+                next(req);
+            }),
+            new Controller(async function TimeoutBis(req: any, res: any, next, done) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                next(req);
+            }),
+        );
+        route.setStepTimeout(20);
+        route.setMaxParallel(3);
+        const progressions: IProgression<any>[] = [];
+        const errors: Error[] = [];
+        const promises = [];
+        for (let i = 0; i < 10; i++) {
+            promises.push(route.match({}, {}, (p) => {
+                progressions.push(p);
+            }).then(_.noop, (e) => {
+                errors.push(e);
+            }));
+        }
+        expect(progressions).to.have.lengthOf(3);
+        await Promise.all(promises);
+        expect(errors).to.have.lengthOf(10);
+    });
+
 });

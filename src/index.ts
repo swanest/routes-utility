@@ -58,12 +58,61 @@ export interface IRouteStatistics {
         };
         TOTAL: number;
     };
+    onHold: number;
     timestamp_ms: number;
+}
+
+// Queue utility for routes
+export class Queue<T> {
+
+    private _offset: number = 0;
+    private _queue: Array<T> = [];
+
+    public get length(): number {
+        return this._queue.length - this._offset;
+    }
+
+    public dequeue(): T {
+        // if the queue is empty, return immediately
+        if (this._queue.length === 0) {
+            return undefined;
+        }
+        // store the item at the front of the queue
+        const item = this._queue[this._offset];
+        // increment the offset and remove the free space if necessary
+        if (++this._offset * 2 >= this._queue.length) {
+            this._queue = this._queue.slice(this._offset);
+            this._offset = 0;
+        }
+        return item;
+    }
+
+    public enqueue(item: T, isUrgent: boolean): this {
+        const lastId = this._queue.push(item) - 1;
+        if (isUrgent) {
+            [this._queue[lastId], this._queue[this._offset]] = [this._queue[this._offset], this._queue[lastId]];
+        }
+        return this;
+    }
+
+    public isEmpty(): boolean {
+        return this._queue.length === 0;
+    }
+
+    public peek(): T {
+        return (this._queue.length > 0 ? this._queue[this._offset] : undefined);
+    }
 }
 
 // Route
 export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
+    private _maxParallel: number;
+    private _onHoldQueue: Queue<{ runner: () => Promise<void>; }>;
+    private _parallel: number = 0;
+    private _stepTimeout: number = -1;
+    private _stepTimeoutHandler: (p: IProgression<any>) => void;
     private _steps: Array<Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>>;
+
     private _name: string;
 
     get name(): string {
@@ -81,6 +130,7 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
             TOTAL: 0,
         },
         timestamp_ms: Date.now(),
+        onHold: 0,
     };
 
     private _initStatistics: IRouteStatistics = this._statistics;
@@ -95,6 +145,10 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
         this._steps = [];
         this._name = name;
         _.each(controllers || [], (c) => this.add(c));
+        this._onHoldQueue = new Queue();
+        this._stepTimeoutHandler = (p: IProgression<any>) => {
+            throw new CustomError('timeout', 'step timed out', 408, 'fatal', {progression: p});
+        };
     }
 
     add(step: Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>): this {
@@ -141,6 +195,7 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
                     TOTAL: y.PENDING.TOTAL - x.PENDING.TOTAL,
                 },
                 timestamp_ms: y.timestamp_ms - x.timestamp_ms,
+                onHold: y.onHold - x.onHold,
             };
         _.keys(y.PENDING.STAGES).forEach((k: string) => {
             s.PENDING.STAGES[k] = y.PENDING.STAGES[k] - (x.PENDING.STAGES[k] || 0);
@@ -148,9 +203,80 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
         return s;
     }
 
-    async match(req: INIT_REQ,
-                context: CONTEXT,
-                onProgress?: (progression: IProgression<Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>>) => any): Promise<FINAL_RES> {
+    public async match(req: INIT_REQ,
+                       context: CONTEXT,
+                       onProgress?: (progression: IProgression<Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>>) => void,
+                       isUrgent: boolean = false,
+                       stepTimeoutMS: number = this._stepTimeout,
+                       stepTimeoutHandler: (p: IProgression<any>) => void = this._stepTimeoutHandler): Promise<FINAL_RES> {
+        return new Promise<FINAL_RES>((resolve, reject) => {
+            // Put in queue
+            this._onHoldQueue.enqueue({
+                runner: async () => {
+                    this._parallel++;
+                    try {
+                        let onProgressFn = onProgress;
+                        if (Number.isFinite(stepTimeoutMS) && stepTimeoutMS > 0) { // wrap onProgress
+                            let lastProgression: IProgression<any> = null;
+                            const handler = () => {
+                                try {
+                                    this._stepTimeoutHandler(lastProgression);
+                                } catch (e) {
+                                    reject(e);
+                                }
+                            };
+                            let t = setTimeout(handler, stepTimeoutMS);
+                            onProgressFn = (progression: IProgression<Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>>): void => {
+                                clearTimeout(t);
+                                lastProgression = progression;
+                                if (onProgress != null) {
+                                    onProgress(progression);
+                                }
+                                t = setTimeout(handler, stepTimeoutMS);
+                            };
+                        }
+                        const response = await this._match(req, context, onProgressFn);
+                        resolve(response);
+                    } catch (e) {
+                        reject(e);
+                    } finally {
+                        this._parallel--;
+                        this._run();
+                    }
+                },
+            }, isUrgent);
+            this._run();
+        });
+    }
+
+    /**
+     * Set max parallel requests
+     * @param {number} n (null or < 0 = unlimited)
+     * @returns {this}
+     */
+    public setMaxParallel(n: number): this {
+        this._maxParallel = n;
+        this._run();
+        return this;
+    }
+
+    /**
+     * Set timeout handler to process each step, by default handler throws a timeout error
+     * @param {number} ms (null or <= 0 = unlimited)
+     * @param {() => void} handler
+     * @returns {this}
+     */
+    public setStepTimeout(ms: number, handler?: () => void): this {
+        this._stepTimeout = ms;
+        if (handler != null) {
+            this._stepTimeoutHandler = handler;
+        }
+        return this;
+    }
+
+    private async _match(req: INIT_REQ,
+                         context: CONTEXT,
+                         onProgress?: (progression: IProgression<Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>>) => void): Promise<FINAL_RES> {
         if (!_.isArray(this._steps) || !this._steps.length) {
             throw new CustomError('invalidRoute', 'route %s does not contain any controller', this._name);
         }
@@ -243,7 +369,15 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
         });
     }
 
+    private _run(): void {
+        const maxParallel = Number.isFinite(this._maxParallel) && this._maxParallel >= 0 ? this._maxParallel : this._onHoldQueue.length;
+        while (this._parallel < maxParallel && this._onHoldQueue.length > 0) {
+            this._onHoldQueue.dequeue().runner();
+        }
+    }
+
 }
+
 
 export interface IRoutes {
     [name: string]: Route<any, any, any>;
