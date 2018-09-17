@@ -137,6 +137,9 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
 
     get statistics(): IRouteStatistics {
         const s = _.cloneDeep(this._statistics);
+        if (this._onHoldQueue) {
+            s.onHold = this._onHoldQueue.length;
+        }
         s.timestamp_ms = Date.now();
         return s;
     }
