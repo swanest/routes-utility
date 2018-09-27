@@ -4,7 +4,7 @@
     "type": "git",
     "url": "https://github.com/swanest/routes-utility"
   },
-  "version": "2.1.5",
+  "version": "2.1.6",
   "scripts": {
     "test": "./node_modules/.bin/mocha --opts tests/mocha.opts tests/**/*.ts",
     "build": "rm -rf dist && ./node_modules/typescript/bin/tsc -p . && rm -rf dist/tests && mv dist/src/** dist/ && rm -rf dist/src",
