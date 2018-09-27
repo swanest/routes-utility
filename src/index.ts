@@ -1,5 +1,7 @@
 import * as _ from 'lodash';
 import { CustomError } from 'sw-logger';
+import Timer = NodeJS.Timer;
+import { Queue } from './Queue';
 
 // Interfaces
 export interface IDoneFn<FINAL_RES> {
@@ -10,7 +12,7 @@ export interface INextFn<NEXT_RES> {
     (res: Error | NEXT_RES, jump?: Controller<any, any, NEXT_RES, any, any> | string): void;
 }
 
-export interface IControllerFn<CONTEXT, INIT_REQ, RES= INIT_REQ, NEXT_RES= INIT_REQ, FINAL_RES= INIT_REQ> {
+export interface IControllerFn<CONTEXT, INIT_REQ, RES = INIT_REQ, NEXT_RES = INIT_REQ, FINAL_RES = INIT_REQ> {
     (this: CONTEXT, req: INIT_REQ, res: RES, next: INextFn<NEXT_RES>, done: IDoneFn<FINAL_RES>): void;
 }
 
@@ -23,7 +25,7 @@ export interface IProgression<C> {
 }
 
 // Controller
-export class Controller<CONTEXT, INIT_REQ, RES= INIT_REQ, NEXT_RES= INIT_REQ, FINAL_RES= INIT_REQ> {
+export class Controller<CONTEXT, INIT_REQ, RES = INIT_REQ, NEXT_RES = INIT_REQ, FINAL_RES = INIT_REQ> {
 
     private _fn: IControllerFn<CONTEXT, INIT_REQ, RES, NEXT_RES, FINAL_RES>;
     private _name: string;
@@ -62,50 +64,8 @@ export interface IRouteStatistics {
     timestamp_ms: number;
 }
 
-// Queue utility for routes
-export class Queue<T> {
-
-    private _offset: number = 0;
-    private _queue: Array<T> = [];
-
-    public get length(): number {
-        return this._queue.length - this._offset;
-    }
-
-    public dequeue(): T {
-        // if the queue is empty, return immediately
-        if (this._queue.length === 0) {
-            return undefined;
-        }
-        // store the item at the front of the queue
-        const item = this._queue[this._offset];
-        // increment the offset and remove the free space if necessary
-        if (++this._offset * 2 >= this._queue.length) {
-            this._queue = this._queue.slice(this._offset);
-            this._offset = 0;
-        }
-        return item;
-    }
-
-    public enqueue(item: T, isUrgent: boolean): this {
-        const lastId = this._queue.push(item) - 1;
-        if (isUrgent) {
-            [this._queue[lastId], this._queue[this._offset]] = [this._queue[this._offset], this._queue[lastId]];
-        }
-        return this;
-    }
-
-    public isEmpty(): boolean {
-        return this._queue.length === 0;
-    }
-
-    public peek(): T {
-        return (this._queue.length > 0 ? this._queue[this._offset] : undefined);
-    }
-}
-
 // Route
-export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
+export class Route<CONTEXT, INIT_REQ, FINAL_RES = INIT_REQ> {
     private _maxParallel: number;
     private _onHoldQueue: Queue<{ runner: () => Promise<void>; }>;
     private _parallel: number = 0;
@@ -214,9 +174,10 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
                        stepTimeoutHandler: (p: IProgression<any>) => void = this._stepTimeoutHandler): Promise<FINAL_RES> {
         return new Promise<FINAL_RES>((resolve, reject) => {
             // Put in queue
-            this._onHoldQueue.enqueue({
+            this._onHoldQueue.add({
                 runner: async () => {
                     this._parallel++;
+                    let stepTimer: Timer = undefined;
                     try {
                         let onProgressFn = onProgress;
                         if (Number.isFinite(stepTimeoutMS) && stepTimeoutMS > 0) { // wrap onProgress
@@ -228,14 +189,15 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
                                     reject(e);
                                 }
                             };
-                            let t = setTimeout(handler, stepTimeoutMS);
+                            stepTimer = setTimeout(handler, stepTimeoutMS);
                             onProgressFn = (progression: IProgression<Controller<CONTEXT, INIT_REQ, any, any, FINAL_RES> | Route<CONTEXT, INIT_REQ, FINAL_RES>>): void => {
-                                clearTimeout(t);
+                                clearTimeout(stepTimer);
+                                stepTimer = undefined;
                                 lastProgression = progression;
                                 if (onProgress != null) {
                                     onProgress(progression);
                                 }
-                                t = setTimeout(handler, stepTimeoutMS);
+                                stepTimer = setTimeout(handler, stepTimeoutMS);
                             };
                         }
                         const response = await this._match(req, context, onProgressFn);
@@ -243,6 +205,8 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
                     } catch (e) {
                         reject(e);
                     } finally {
+                        clearTimeout(stepTimer);
+                        stepTimer = undefined;
                         this._parallel--;
                         this._run();
                     }
@@ -375,7 +339,7 @@ export class Route<CONTEXT, INIT_REQ, FINAL_RES= INIT_REQ> {
     private _run(): void {
         const maxParallel = Number.isFinite(this._maxParallel) && this._maxParallel >= 0 ? this._maxParallel : this._onHoldQueue.length;
         while (this._parallel < maxParallel && this._onHoldQueue.length > 0) {
-            this._onHoldQueue.dequeue().runner();
+            this._onHoldQueue.next().runner();
         }
     }
 

@@ -1,4 +1,5 @@
 {
+  "version": "2.8.1",
   "compilerOptions": {
     "outDir": "dist/",
     "sourceMap": true,
@@ -8,7 +9,6 @@
     "target": "es6",
     "declaration": true,
     "noImplicitAny": true,
-    "removeComments": true,
     "rootDir": "."
   },
   "include": [
