@@ -13,7 +13,6 @@ describe('Queue', () => {
         q.add('abc');
         const el: any = {
             value: 'abc',
-            prev: null,
             next: null,
         };
         expect(q.head).to.deep.equal(el);
@@ -28,12 +27,8 @@ describe('Queue', () => {
         q.add('ghi');
         expect(q.head.value).to.equal('abc');
         expect(q.tail.value).to.equal('ghi');
-        expect(q.head.prev).to.equal(null);
         expect(q.tail.next).to.equal(null);
         expect(q.head.next.value).to.equal('def');
-        expect(q.tail.prev.value).to.equal('def');
-
-        expect(q.head.next.prev).to.equal(q.head);
         expect(q.head.next.next).to.equal(q.tail);
 
         expect(q.length).to.equal(3);

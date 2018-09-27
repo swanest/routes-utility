@@ -20,19 +20,16 @@ export class Queue<T> {
     public add(value: T, placeFirst: boolean = false) {
         const newNode: INode<T> = {
             value: value,
-            prev: null,
             next: null,
         };
         if (this._length === 0) {
             this._head = this._tail = newNode;
         } else {
             if (placeFirst) {
-                this._head.prev = newNode;
                 newNode.next = this._head;
                 this._head = newNode;
             } else {
                 this._tail.next = newNode;
-                newNode.prev = this._tail;
                 this._tail = newNode;
             }
         }
@@ -41,24 +38,21 @@ export class Queue<T> {
     }
 
     public next() {
-        if (this.length === 0) {
+        if (this._length === 0) {
             return undefined;
         }
 
-        const value = this._head.value;
-        this._head = this._head.next;
-        if (this._head) {
-            this._head.prev = null;
-        }
+        const currentHead = this._head;
+        this._head = currentHead.next;
+        currentHead.next = null;
 
         this._length--;
 
-        return value;
+        return currentHead.value;
     }
 }
 
 interface INode<T> {
     next: INode<T> | null;
-    prev: INode<T> | null;
     value: T;
 }
